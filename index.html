@@ -1,0 +1,737 @@
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Energy Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #00ff9d;
+            --secondary: #00b8ff;
+            --dark: #121212;
+            --darker: #0a0a0a;
+            --light: #f5f5f5;
+            --gray: #333333;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+        
+        body {
+            background-color: var(--dark);
+            color: var(--light);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--gray);
+        }
+        
+        .greeting h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .greeting p {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #ff3333;
+        }
+        
+        .status.connected .status-indicator {
+            background-color: var(--primary);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .card {
+            background-color: var(--darker);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 1px solid var(--gray);
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .card-title {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .card-value {
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .card-unit {
+            font-size: 0.9rem;
+            color: #777;
+        }
+        
+        .section-divider {
+            margin: 15px 0;
+            border: 0;
+            height: 1px;
+            background-image: linear-gradient(to right, transparent, var(--gray), transparent);
+        }
+        
+        .chart-container {
+            height: 450px;
+            margin-bottom: 15px;
+            background-color: var(--darker);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--gray);
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .chart-title {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #aaa;
+        }
+        
+        .time-range-selector {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .time-range-btn {
+            background-color: var(--gray);
+            color: #aaa;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+        
+        .time-range-btn.active {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            color: var(--dark);
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .control-card {
+            background-color: var(--darker);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid var(--gray);
+        }
+        
+        .control-title {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #aaa;
+            text-align: center;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-bottom: 15px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .power-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #444;
+        }
+        
+        .active .power-icon {
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+        }
+        
+        .energy-history-container {
+            margin-top: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .energy-history-container h2 {
+            color: #aaa;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+        
+        @media (max-width: 768
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .dashboard, .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .card-value {
+                font-size: 1.8rem;
+            }
+            
+            .time-range-selector {
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="greeting">
+                <h1>Welcome back, Al-Mubarak</h1>
+                <p>Your home energy at a glance</p>
+            </div>
+            <div class="status" id="connectionStatus">
+                <div class="status-indicator"></div>
+                <span>Disconnected</span>
+            </div>
+        </header>
+        
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Voltage</span>
+                </div>
+                <div class="card-value" id="voltage">0.00</div>
+                <span class="card-unit">Volts</span>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Current</span>
+                </div>
+                <div class="card-value" id="current">0.00</div>
+                <span class="card-unit">Amps</span>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Power</span>
+                </div>
+                <div class="card-value" id="power">0.00</div>
+                <span class="card-unit">Watts</span>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Energy</span>
+                </div>
+                <div class="card-value" id="energy">0.00</div>
+                <span class="card-unit">kWh</span>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Frequency</span>
+                </div>
+                <div class="card-value" id="frequency">0.00</div>
+                <span class="card-unit">Hz</span>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Power Factor</span>
+                </div>
+                <div class="card-value" id="powerFactor">0.00</div>
+                <span class="card-unit">Ratio</span>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3 class="chart-title">Real-time Power Consumption</h3>
+                <div class="time-range-selector">
+                    <button class="time-range-btn active" data-minutes="5">5 min</button>
+                    <button class="time-range-btn" data-minutes="15">15 min</button>
+                    <button class="time-range-btn" data-minutes="30">30 min</button>
+                    <button class="time-range-btn" data-minutes="60">1 hour</button>
+                </div>
+            </div>
+            <canvas id="powerChart"></canvas>
+        </div>
+        
+        <hr class="section-divider">
+        
+        <h2 style="margin-bottom: 15px; color: #aaa; font-weight: 500;">Appliance Controls</h2>
+        
+        <div class="controls">
+            <div class="control-card" id="control1">
+                <div class="power-icon">💡</div>
+                <h3 class="control-title">Living Room Light</h3>
+                <label class="switch">
+                    <input type="checkbox" id="switch1">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="control-card" id="control2">
+                <div class="power-icon">💡</div>
+                <h3 class="control-title">Bedroom Light</h3>
+                <label class="switch">
+                    <input type="checkbox" id="switch2">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="control-card" id="control3">
+                <div class="power-icon">💡</div>
+                <h3 class="control-title">Security Light</h3>
+                <label class="switch">
+                    <input type="checkbox" id="switch3">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="control-card" id="control4">
+                <div class="power-icon">🔌</div>
+                <h3 class="control-title">Power Outlet 1</h3>
+                <label class="switch">
+                    <input type="checkbox" id="switch4">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="control-card" id="control5">
+                <div class="power-icon">🔌</div>
+                <h3 class="control-title">Power Outlet 2</h3>
+                <label class="switch">
+                    <input type="checkbox" id="switch5">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="control-card" id="control6">
+                <div class="power-icon">🔌</div>
+                <h3 class="control-title">Power Outlet 3</h3>
+                <label class="switch">
+                    <input type="checkbox" id="switch6">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="control-card" id="control7">
+                <div class="power-icon">⚡</div>
+                <h3 class="control-title">Main Power</h3>
+                <label class="switch">
+                    <input type="checkbox" id="switch7">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <hr class="section-divider">
+        
+        <div class="energy-history-container">
+            <h2>Energy Consumption History</h2>
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3 class="chart-title">Historical Energy Usage</h3>
+                    <div class="time-range-selector">
+                        <button class="time-range-btn active" data-range="hourly">Last 24h</button>
+                        <button class="time-range-btn" data-range="daily">Last 7d</button>
+                        <button class="time-range-btn" data-range="weekly">Last 4w</button>
+                        <button class="time-range-btn" data-range="monthly">Last 12m</button>
+                    </div>
+                </div>
+                <canvas id="energyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        // Connection state monitoring
+        firebase.database().ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                connectionStatus.classList.add('connected');
+                connectionStatus.querySelector('span').textContent = 'Connected';
+            } else {
+                connectionStatus.classList.remove('connected');
+                connectionStatus.querySelector('span').textContent = 'Disconnected';
+            }
+        });
+
+        // Power Chart (Real-time)
+        const powerCtx = document.getElementById('powerChart').getContext('2d');
+        const powerChart = new Chart(powerCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Power (W)',
+                    data: [],
+                    borderColor: '#00ff9d',
+                    backgroundColor: 'rgba(0, 255, 157, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 0
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa'
+                        }
+                    },
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            displayFormats: {
+                                minute: 'HH:mm'
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa',
+                            maxTicksLimit: 10
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#fff',
+                            boxWidth: 0,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#00ff9d',
+                        bodyColor: '#fff',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+
+        // Energy Chart (History)
+        const energyCtx = document.getElementById('energyChart').getContext('2d');
+        const energyChart = new Chart(energyCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Energy (kWh)',
+                    data: [],
+                    borderColor: '#00b8ff',
+                    backgroundColor: 'rgba(0, 184, 255, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa'
+                        }
+                    },
+                    x: {
+                        type: 'time',
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#fff',
+                            boxWidth: 0,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#00b8ff',
+                        bodyColor: '#fff',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+
+        // Real-time data handling
+        let powerDataPoints = [];
+        let energyDataPoints = [];
+        let currentTimeRange = 5; // Default to 5 minutes
+        
+        function updatePowerChart(timestamp, power) {
+            const time = new Date(timestamp);
+            
+            // Add new data point
+            powerDataPoints.push({
+                x: time,
+                y: power
+            });
+            
+            // Remove old data points based on time range
+            const maxAge = currentTimeRange * 60 * 1000; // Convert to milliseconds
+            const now = new Date();
+            powerDataPoints = powerDataPoints.filter(point => now - point.x < maxAge);
+            
+            // Update chart
+            powerChart.data.datasets[0].data = powerDataPoints;
+            powerChart.update();
+        }
+
+        function updateEnergyChart(timestamp, energy) {
+            const time = new Date(timestamp);
+            
+            // Add new data point
+            energyDataPoints.push({
+                x: time,
+                y: energy
+            });
+            
+            // Keep only the last 500 points
+            if (energyDataPoints.length > 500) {
+                energyDataPoints.shift();
+            }
+            
+            // Update chart
+            energyChart.data.datasets[0].data = energyDataPoints;
+            energyChart.update();
+        }
+
+        // Time range selectors for power chart
+        document.querySelectorAll('.chart-container:first-child .time-range-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.chart-container:first-child .time-range-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                currentTimeRange = parseInt(this.dataset.minutes);
+            });
+        });
+
+        // Time range selectors for energy chart
+        document.querySelectorAll('.energy-history-container .time-range-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.energy-history-container .time-range-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Listen for realtime data updates
+        database.ref('sensor_data').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                document.getElementById('voltage').textContent = data.voltage.toFixed(2);
+                document.getElementById('current').textContent = data.current.toFixed(2);
+                document.getElementById('power').textContent = data.power.toFixed(2);
+                document.getElementById('energy').textContent = data.energy.toFixed(3);
+                document.getElementById('frequency').textContent = data.frequency.toFixed(2);
+                document.getElementById('powerFactor').textContent = data.power_factor.toFixed(2);
+                
+                updatePowerChart(data.timestamp || Date.now(), data.power);
+                updateEnergyChart(data.timestamp || Date.now(), data.energy);
+            }
+        });
+
+        // Initialize switch states and set up event listeners
+        for (let i = 1; i <= 7; i++) {
+            const switchElement = document.getElementById(`switch${i}`);
+            const controlCard = document.getElementById(`control${i}`);
+            
+            // Listen for Firebase updates
+            database.ref(`control/relay${i}`).on('value', (snapshot) => {
+                const state = snapshot.val();
+                switchElement.checked = state;
+                if (state) {
+                    controlCard.classList.add('active');
+                } else {
+                    controlCard.classList.remove('active');
+                }
+            });
+            
+            // Handle user input
+            switchElement.addEventListener('change', function() {
+                const state = this.checked;
+                database.ref(`control/relay${i}`).set(state);
+            });
+        }
+    </script>
+</body>
+</html>
