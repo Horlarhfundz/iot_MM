@@ -448,13 +448,7 @@
     <!-- Power Chart Section -->
     <div class="chart-section">
       <div class="chart-header">
-        <h3 class="chart-title">Real-time Power Consumption</h3>
-        <div class="time-range-selector" id="power-range">
-          <button class="time-range-btn active" data-minutes="5">5 min</button>
-          <button class="time-range-btn" data-minutes="15">15 min</button>
-          <button class="time-range-btn" data-minutes="30">30 min</button>
-          <button class="time-range-btn" data-minutes="60">1 hour</button>
-        </div>
+        <h3 class="chart-title">Real-time Power Consumption (1 Hour)</h3>
       </div>
       <div class="chart-container"><canvas id="powerChart"></canvas></div>
     </div>
@@ -478,7 +472,6 @@
           <button class="time-range-btn active" data-range="24">Last 24h</button>
           <button class="time-range-btn" data-range="168">Last 7d</button>
           <button class="time-range-btn" data-range="672">Last 4w</button>
-          <button class="time-range-btn" data-range="8760">Last 12m</button>
         </div>
       </div>
       <div class="chart-container"><canvas id="energyChart"></canvas></div>
@@ -520,14 +513,14 @@
     // Data storage for charts
     let allPowerData = [];
     let allEnergyData = [];
-    let currentTimeRange = 5; // minutes
-    let currentEnergyRange = 24; // hours
+    const currentTimeRange = 60; // 1 hour for power chart
+    let currentEnergyRange = 24; // hours for energy chart
     
     // Initialize charts
     const powerCtx = document.getElementById("powerChart").getContext("2d");
     const energyCtx = document.getElementById("energyChart").getContext("2d");
     
-    // Power Chart
+    // Power Chart - Fixed to 1 hour
     const powerChart = new Chart(powerCtx, {
       type: 'line',
       data: {
@@ -734,18 +727,17 @@
       }
     });
     
-    // Update power chart with time filter
+    // Update power chart with fixed 1-hour time range
     function updatePowerChart() {
       const now = Date.now();
-      const maxAge = currentTimeRange * 60 * 1000; // Convert to milliseconds
+      const maxAge = currentTimeRange * 60 * 1000; // Convert to milliseconds (1 hour)
       
-      // Filter data based on current time range
+      // Filter data based on fixed time range
       const filteredData = allPowerData.filter(point => now - point.x <= maxAge);
       
       // Update chart
       powerChart.data.datasets[0].data = filteredData;
-      chart.update('none')
-
+      powerChart.update('none');
     }
     
     // Update energy chart with time filter
@@ -761,20 +753,10 @@
       energyChart.update();
     }
     
-    // Time range selectors for power chart
-document.querySelectorAll('#power-range .time-range-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('.chart-section:first-child .time-range-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        currentTimeRange = parseInt(this.dataset.minutes);
-        updatePowerChart();
-      });
-    });
-    
-    // Time range selectors for energy chart
+    // Time range selectors for energy chart (removed Last 12m)
     document.querySelectorAll('#energy-range .time-range-btn').forEach(btn => {
       btn.addEventListener('click', function() {
-        document.querySelectorAll('.chart-section:last-child .time-range-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#energy-range .time-range-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         currentEnergyRange = parseInt(this.dataset.range);
         updateEnergyChart();
@@ -855,17 +837,16 @@ document.querySelectorAll('#power-range .time-range-btn').forEach(btn => {
     // Generate initial chart data for demo
     function generateInitialData() {
       const now = Date.now();
-      // Generate initial power data
-      for (let i = 0; i < 100; i++) {
-        const time = new Date(now - (100 - i) * 3000); // 3 second intervals
+      // Generate initial power data (1 hour)
+      for (let i = 0; i < 120; i++) {
+        const time = new Date(now - (120 - i) * 30000); // 30 second intervals
         const power = 100 + Math.random() * 300; // Random power between 100-400W
         allPowerData.push({ x: time, y: power });
       }
       
       // Generate initial energy data
-      for (let i = 0; i < 8760; i++) {
-      const time = new Date(now - (8760 - i) * 3600000); // 1 year of hourly data
- // 1 hour intervals
+      for (let i = 0; i < 672; i++) {
+        const time = new Date(now - (672 - i) * 3600000); // 4 weeks of hourly data
         const energy = 0.5 + Math.random() * 2; // Random energy between 0.5-2.5 kWh
         allEnergyData.push({ x: time, y: energy });
       }
