@@ -1,4 +1,4 @@
-        <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -16,9 +16,10 @@
             --darker: #0a0a0a;
             --light: #f5f5f5;
             --gray: #333333;
+            --error: #ff3860;
+            --warning: #ffdd57;
         }
             
-        
         * {
             margin: 0;
             padding: 0;
@@ -276,7 +277,53 @@
             margin-bottom: 15px;
         }
         
-        @media (max-width: 768
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            background-color: var(--darker);
+            color: var(--light);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 4px solid;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            border-left-color: var(--primary);
+        }
+        
+        .notification.error {
+            border-left-color: var(--error);
+        }
+        
+        .notification.warning {
+            border-left-color: var(--warning);
+        }
+        
+        .notification-icon {
+            font-size: 1.5rem;
+        }
+        
+        .notification-content h4 {
+            margin-bottom: 5px;
+        }
+        
+        .notification-content p {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        
         @media (max-width: 768px) {
             .dashboard {
                 grid-template-columns: 1fr 1fr;
@@ -467,6 +514,15 @@
         </div>
     </div>
 
+    <!-- Notification container -->
+    <div class="notification" id="notification">
+        <div class="notification-icon" id="notificationIcon"></div>
+        <div class="notification-content">
+            <h4 id="notificationTitle">Notification</h4>
+            <p id="notificationMessage">This is a notification message</p>
+        </div>
+    </div>
+
     <script>
         // Firebase configuration
         const firebaseConfig = {
@@ -483,16 +539,52 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         const connectionStatus = document.getElementById('connectionStatus');
+        
+        // Notification system
+        const notification = document.getElementById('notification');
+        const notificationTitle = document.getElementById('notificationTitle');
+        const notificationMessage = document.getElementById('notificationMessage');
+        const notificationIcon = document.getElementById('notificationIcon');
+        
+        function showNotification(type, title, message) {
+            notification.className = `notification show ${type}`;
+            notificationTitle.textContent = title;
+            notificationMessage.textContent = message;
+            
+            // Set icon based on notification type
+            if (type === 'success') {
+                notificationIcon.textContent = '✅';
+            } else if (type === 'error') {
+                notificationIcon.textContent = '❌';
+            } else {
+                notificationIcon.textContent = '⚠️';
+            }
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                notification.className = 'notification';
+            }, 5000);
+        }
 
         // Connection state monitoring
         firebase.database().ref('.info/connected').on('value', (snapshot) => {
             if (snapshot.val() === true) {
                 connectionStatus.classList.add('connected');
                 connectionStatus.querySelector('span').textContent = 'Connected';
+                showNotification('success', 'Connected', 'Successfully connected to Firebase');
             } else {
                 connectionStatus.classList.remove('connected');
                 connectionStatus.querySelector('span').textContent = 'Disconnected';
+                showNotification('error', 'Disconnected', 'Connection to Firebase lost');
             }
+        });
+
+        // Error handling for Firebase
+        database.ref().on('value', () => {
+            // Success handler
+        }, (error) => {
+            console.error('Firebase Error:', error);
+            showNotification('error', 'Firebase Error', error.message);
         });
 
         // Power Chart (Real-time)
@@ -640,7 +732,8 @@
         let currentTimeRange = 5; // Default to 5 minutes
         
         function updatePowerChart(timestamp, power) {
-            const time = new Date(timestamp);
+            // Use current client time instead of device timestamp
+            const time = new Date();
             
             // Add new data point
             powerDataPoints.push({
@@ -659,7 +752,8 @@
         }
 
         function updateEnergyChart(timestamp, energy) {
-            const time = new Date(timestamp);
+            // Use current client time instead of device timestamp
+            const time = new Date();
             
             // Add new data point
             energyDataPoints.push({
@@ -706,9 +800,13 @@
                 document.getElementById('frequency').textContent = data.frequency.toFixed(2);
                 document.getElementById('powerFactor').textContent = data.power_factor.toFixed(2);
                 
-                updatePowerChart(data.timestamp || Date.now(), data.power);
-                updateEnergyChart(data.timestamp || Date.now(), data.energy);
+                // Use client time instead of device time
+                updatePowerChart(Date.now(), data.power);
+                updateEnergyChart(Date.now(), data.energy);
             }
+        }, (error) => {
+            console.error('Sensor Data Error:', error);
+            showNotification('error', 'Data Error', 'Failed to load sensor data');
         });
 
         // Initialize switch states and set up event listeners
@@ -725,14 +823,30 @@
                 } else {
                     controlCard.classList.remove('active');
                 }
+            }, (error) => {
+                console.error(`Relay ${i} State Error:`, error);
+                showNotification('error', 'Control Error', `Failed to get relay ${i} state`);
             });
             
             // Handle user input
             switchElement.addEventListener('change', function() {
                 const state = this.checked;
-                database.ref(`control/relay${i}`).set(state);
+                database.ref(`control/relay${i}`).set(state)
+                    .then(() => {
+                        const status = state ? 'ON' : 'OFF';
+                        showNotification('success', 'Control Updated', `Relay ${i} turned ${status}`);
+                    })
+                    .catch((error) => {
+                        console.error(`Relay ${i} Update Error:`, error);
+                        showNotification('error', 'Update Failed', `Failed to update relay ${i}`);
+                        // Revert UI to previous state
+                        this.checked = !state;
+                    });
             });
         }
+        
+        // Initial UI state
+        showNotification('info', 'Loading', 'Connecting to Firebase...');
     </script>
 </body>
 </html>
